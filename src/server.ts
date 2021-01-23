@@ -78,15 +78,13 @@ export interface BridgeConfiguration {
   model?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface AccessoryConfig extends Record<string, any> {
+export interface AccessoryConfig extends Record<string, unknown> {
   accessory: AccessoryName | AccessoryIdentifier;
   name: string;
   uuid_base?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface PlatformConfig extends Record<string, any>  {
+export interface PlatformConfig extends Record<string, unknown>  {
   platform: PlatformName | PlatformIdentifier;
   name?: string;
 }
@@ -174,7 +172,7 @@ export class Server {
     info.setCharacteristic(Characteristic.FirmwareRevision, getVersion());
 
     this.bridge.on(AccessoryEventTypes.LISTENING, (port: number) => {
-      log.info("Homebridge is running on port %s.", port);
+      log.info("Homebridge v%s is running on port %s.", getVersion(), port);
     });
 
     const publishInfo: PublishInfo = {
@@ -412,7 +410,15 @@ export class Server {
   private async loadPlatformAccessories(plugin: Plugin, platformInstance: StaticPlatformPlugin, platformType: PlatformName | PlatformIdentifier, logger: Logging): Promise<void> {
     // Plugin 1.0, load accessories
     return new Promise(resolve => {
+      // warn the user if the static platform is blocking the startup of Homebridge for to long
+      const loadDelayWarningInterval = setInterval(() => {
+        logger.warn("%s is taking a long time to load and preventing Homebridge from starting.", plugin.getPluginIdentifier());
+      }, 20000);
+
       platformInstance.accessories(once((accessories: AccessoryPlugin[]) => {
+        // clear the load delay warning interval
+        clearInterval(loadDelayWarningInterval);
+
         // loop through accessories adding them to the list and registering them
         accessories.forEach((accessoryInstance, index) => {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -519,7 +525,7 @@ export class Server {
           log.warn("The plugin '%s' registered a new accessory for the platform '%s'. The platform couldn't be found though!", accessory._associatedPlugin!, accessory._associatedPlatform!);
         }
       } else {
-        log.warn("A platform configure a new accessory under the plugin name '%s'. However no loaded plugin could be found for the name!", accessory._associatedPlugin);
+        log.warn("A platform configured a new accessory under the plugin name '%s'. However no loaded plugin could be found for the name!", accessory._associatedPlugin);
       }
 
       return accessory._associatedHAPAccessory;
